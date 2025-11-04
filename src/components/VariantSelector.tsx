@@ -16,7 +16,7 @@ export function VariantSelector({ productId, onVariantChange }: VariantSelectorP
   const [selectedValues, setSelectedValues] = useState<Record<string, string>>({})
 
   // Get unique attributes across all variants
-  const attributes = variants?.reduce((acc, variant) => {
+  const attributes: Record<string, any> = variants?.reduce((acc, variant) => {
     variant.attributes.forEach(attr => {
       if (!acc[attr.attribute.id]) {
         acc[attr.attribute.id] = attr.attribute
@@ -59,7 +59,7 @@ export function VariantSelector({ productId, onVariantChange }: VariantSelectorP
       }) && variant.attributes.length === Object.keys(selectedValues).length
     })
 
-    onVariantChange(matchingVariant || null)
+    onVariantChange((matchingVariant as any) || null)
   }, [selectedValues, variants, onVariantChange])
 
   if (isLoading) return null

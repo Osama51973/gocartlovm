@@ -187,11 +187,20 @@ SELECT
 FROM public.products p;
 
 -- Update store product counts
+-- Update store product counts (two-step: set counts where products exist, then set zero for others)
 UPDATE public.stores s
-SET total_products = (
-  SELECT COUNT(*)
-  FROM public.products p
-  WHERE p.store_id = s.id
+SET total_products = sub.count
+FROM (
+  SELECT store_id, COUNT(*) AS count
+  FROM public.products
+  GROUP BY store_id
+) AS sub
+WHERE s.id = sub.store_id;
+
+UPDATE public.stores s
+SET total_products = 0
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.products p WHERE p.store_id = s.id
 );
 
 -- Insert dummy coupons

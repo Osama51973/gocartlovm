@@ -9,8 +9,7 @@ export function useProductAttributes() {
   return useQuery({
     queryKey: ['productAttributes', language],
     queryFn: async () => {
-      const { data: attributes, error } = await supabase
-        .from('product_attributes')
+      const { data: attributes, error } = await (supabase as any).from('product_attributes')
         .select(`
           *,
           translations (
@@ -51,8 +50,7 @@ export function useProductVariants(productId: string) {
   return useQuery({
     queryKey: ['productVariants', productId, language],
     queryFn: async () => {
-      const { data: variants, error } = await supabase
-        .from('product_variants')
+      const { data: variants, error } = await (supabase as any).from('product_variants')
         .select(`
           *,
           attributes: product_variant_attributes (

@@ -25,7 +25,7 @@ export function useProductVariantMutations() {
   const createVariants = useMutation({
     mutationFn: async ({ productId, variants }: CreateVariantOptions) => {
       // First create all variants
-      const { data: createdVariants, error: variantsError } = await supabase
+      const { data: createdVariants, error: variantsError } = await (supabase as any)
         .from('product_variants')
         .insert(
           variants.map(variant => ({
@@ -43,7 +43,7 @@ export function useProductVariantMutations() {
       if (!createdVariants) throw new Error('Failed to create variants')
 
       // Then create all variant attributes
-      const variantAttributes: ProductVariantAttribute[] = []
+      const variantAttributes: any[] = []
       for (let i = 0; i < createdVariants.length; i++) {
         const variant = createdVariants[i]
         const variantInput = variants[i]
@@ -58,14 +58,14 @@ export function useProductVariantMutations() {
         }
       }
 
-      const { error: attributesError } = await supabase
+      const { error: attributesError } = await (supabase as any)
         .from('product_variant_attributes')
         .insert(variantAttributes)
 
       if (attributesError) throw attributesError
 
       // Update product to indicate it has variants
-      const { error: productError } = await supabase
+      const { error: productError } = await (supabase as any)
         .from('products')
         .update({
           has_variants: true,
@@ -85,7 +85,7 @@ export function useProductVariantMutations() {
 
   const updateVariant = useMutation({
     mutationFn: async (variant: ProductVariant) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('product_variants')
         .update({
           sku: variant.sku,
@@ -107,7 +107,7 @@ export function useProductVariantMutations() {
 
   const deleteVariant = useMutation({
     mutationFn: async (variantId: string) => {
-      const { error } = await supabase
+      const { error } = await (supabase as any)
         .from('product_variants')
         .delete()
         .eq('id', variantId)

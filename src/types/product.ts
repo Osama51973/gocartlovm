@@ -14,9 +14,7 @@ export type ProductAttributeWithTranslations = ProductAttribute & {
   })[]
 }
 
-export type ProductWithTranslations = Database['public']['Tables']['products']['Row'] & {
-  product_translations: Database['public']['Tables']['product_translations']['Row'][]
-}
+export type ProductWithTranslations = Database['public']['Tables']['products']['Row'] & { product_translations?: any[] }
 
 export type ProductVariantWithAttributes = ProductVariant & {
   attributes: (ProductVariantAttribute & {

@@ -1,6 +1,11 @@
 -- Make user_id NOT NULL
-ALTER TABLE public.stores 
-ALTER COLUMN user_id SET NOT NULL;
+-- Make user_id NOT NULL only if there are no NULL values
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.stores WHERE user_id IS NULL) THEN
+    ALTER TABLE public.stores ALTER COLUMN user_id SET NOT NULL;
+  END IF;
+END$$;
 
 -- Add missing columns for store details
 ALTER TABLE public.stores 
