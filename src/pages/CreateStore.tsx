@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Upload } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const CreateStore = () => {
   const { user, hasRole, loading: authLoading } = useAuth();
@@ -16,8 +17,11 @@ const CreateStore = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
-    name: '',
-    description: '',
+    // support bilingual fields
+    name_en: '',
+    description_en: '',
+    name_ar: '',
+    description_ar: '',
     email: '',
     contactNumber: '',
     address: '',
@@ -34,27 +38,95 @@ const CreateStore = () => {
     setLoading(true);
 
     try {
-      const { error: storeError } = await supabase
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
+      // Check if we have at least one language filled out
+      if (!formData.name_en && !formData.name_ar) {
+        throw new Error('Store name is required in at least one language');
+      }
+
+      // Check if slug is available
+      const { data: existingStore, error: slugCheckError } = await supabase
+        .from('stores')
+        .select('id')
+        .eq('slug', formData.username)
+        .maybeSingle();
+
+      if (slugCheckError) throw slugCheckError;
+      if (existingStore) throw new Error('Store username is already taken');
+
+      // Create store row with all fields
+      const { data: storeData, error: storeError } = await supabase
         .from('stores')
         .insert({
           slug: formData.username,
-          user_id: user?.id,
+          user_id: user.id,
+          email: formData.email,
+          contact_number: formData.contactNumber,
+          address: formData.address
         })
         .select()
         .single();
 
       if (storeError) throw storeError;
+      if (!storeData) throw new Error('Failed to create store');
+
+      const translationsToInsert: any[] = [];
+      if (formData.name_en || formData.description_en) {
+        translationsToInsert.push({
+          store_id: storeData.id,
+          language_code: 'en',
+          name: formData.name_en || formData.name_ar || formData.username,
+          description: formData.description_en || null,
+        });
+      }
+      if (formData.name_ar || formData.description_ar) {
+        translationsToInsert.push({
+          store_id: storeData.id,
+          language_code: 'ar',
+          name: formData.name_ar || formData.name_en || formData.username,
+          description: formData.description_ar || null,
+        });
+      }
+
+      // Always insert at least one translation
+      if (translationsToInsert.length === 0) {
+        throw new Error('At least one language translation is required');
+      }
+
+      const { error: transError } = await supabase
+        .from('store_translations')
+        .insert(translationsToInsert);
+
+      if (transError) throw transError;
+
+      // Verify the store was created successfully by trying to read it back
+      const { data: verifyStore, error: verifyError } = await supabase
+        .from('stores')
+        .select(`
+          *,
+          store_translations (*)
+        `)
+        .eq('id', storeData.id)
+        .single();
+
+      if (verifyError || !verifyStore) {
+        throw new Error('Failed to verify store creation. Please try again.');
+      }
 
       toast({
         title: 'Success',
         description: 'Your store has been submitted for admin verification.',
       });
 
-      navigate('/seller');
+      navigate('/seller/dashboard');
     } catch (error: any) {
+      console.error('Store creation error:', error);
       toast({
         title: 'Error',
-        description: error.message,
+        description: error.message || 'Failed to create store. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -64,12 +136,15 @@ const CreateStore = () => {
 
   if (authLoading) return null;
 
+  const { language, t } = useLanguage();
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <h1 className="text-4xl font-bold mb-2">Add Your Store</h1>
+      <h1 className="text-4xl font-bold mb-2">{language === 'ar' ? 'إضافة متجرك' : 'Add Your Store'}</h1>
       <p className="text-muted-foreground mb-8">
-        To become a seller on GoCart, submit your store details for review. Your
-        store will be activated after admin verification.
+        {language === 'ar'
+          ? 'لتصبح بائعًا على GoCart، قم بتقديم تفاصيل متجرك للمراجعة. سيتم تفعيل متجرك بعد موافقة المسؤول.'
+          : 'To become a seller on GoCart, submit your store details for review. Your store will be activated after admin verification.'}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -94,24 +169,47 @@ const CreateStore = () => {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="name">Name</Label>
+          <Label htmlFor="name_en">{language === 'ar' ? 'الاسم (إنجليزي)' : 'Name (English)'}</Label>
           <Input
-            id="name"
+            id="name_en"
             type="text"
-            placeholder="Enter your store name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
+            placeholder={language === 'ar' ? 'أدخل اسم متجرك بالإنجليزية' : 'Enter your store name in English'}
+            value={formData.name_en}
+            onChange={(e) => setFormData({ ...formData, name_en: e.target.value })}
+            required={!formData.name_ar}
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="description_en">{language === 'ar' ? 'الوصف (إنجليزي)' : 'Description (English)'}</Label>
           <Textarea
-            id="description"
-            placeholder="Enter your store description"
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            id="description_en"
+            placeholder={language === 'ar' ? 'أدخل وصف المتجر بالإنجليزية' : 'Enter your store description in English'}
+            value={formData.description_en}
+            onChange={(e) => setFormData({ ...formData, description_en: e.target.value })}
+            rows={4}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="name_ar">{language === 'ar' ? 'الاسم (عربي)' : 'Name (Arabic)'}</Label>
+          <Input
+            id="name_ar"
+            type="text"
+            placeholder={language === 'ar' ? 'أدخل اسم متجرك بالعربية' : 'Enter your store name in Arabic'}
+            value={formData.name_ar}
+            onChange={(e) => setFormData({ ...formData, name_ar: e.target.value })}
+            required={!formData.name_en}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="description_ar">{language === 'ar' ? 'الوصف (عربي)' : 'Description (Arabic)'}</Label>
+          <Textarea
+            id="description_ar"
+            placeholder={language === 'ar' ? 'أدخل وصف المتجر بالعربية' : 'Enter your store description in Arabic'}
+            value={formData.description_ar}
+            onChange={(e) => setFormData({ ...formData, description_ar: e.target.value })}
             rows={4}
           />
         </div>

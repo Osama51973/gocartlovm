@@ -6,21 +6,29 @@ import { Button } from '@/components/ui/button';
 import { Star, ShoppingCart, Package, CreditCard, Users, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VariantSelector } from '@/components/VariantSelector';
+import { useState } from 'react';
+import type { ProductVariantWithAttributes, ProductWithTranslations } from '@/types/product';
 
 const ProductDetail = () => {
   const { slug } = useParams();
   const { language, t } = useLanguage();
 
-  const { data: product, isLoading } = useQuery({
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariantWithAttributes | null>(null);
+
+  const { data: product, isLoading } = useQuery<ProductWithTranslations>({
     queryKey: ['product', slug, language],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('products')
-        .select('*, product_translations(*)')
+        .select(`
+          *,
+          product_translations(*)
+        `)
         .eq('slug', slug)
         .single();
       if (error) throw error;
-      return data;
+      return data as ProductWithTranslations;
     },
   });
 
@@ -112,27 +120,90 @@ const ProductDetail = () => {
             </div>
 
             <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold">${Number(product.price).toFixed(0)}</span>
-              {product.original_price && (
+              {product.has_variants ? (
+                selectedVariant ? (
+                  <>
+                    <span className="text-4xl font-bold">
+                      ${Number(selectedVariant.price).toFixed(0)}
+                    </span>
+                    {selectedVariant.original_price && (
+                      <>
+                        <span className="text-xl text-muted-foreground line-through">
+                          ${Number(selectedVariant.original_price).toFixed(0)}
+                        </span>
+                        <span className="text-sm text-green-600">
+                          Save {Math.round(((selectedVariant.original_price - selectedVariant.price) / selectedVariant.original_price) * 100)}% right now
+                        </span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-4xl font-bold">
+                    From ${Number(product.base_price || product.price).toFixed(0)}
+                  </span>
+                )
+              ) : (
                 <>
-                  <span className="text-xl text-muted-foreground line-through">
-                    ${Number(product.original_price).toFixed(0)}
-                  </span>
-                  <span className="text-sm text-green-600">
-                    Save {discount}% right now
-                  </span>
+                  <span className="text-4xl font-bold">${Number(product.price).toFixed(0)}</span>
+                  {product.original_price && (
+                    <>
+                      <span className="text-xl text-muted-foreground line-through">
+                        ${Number(product.original_price).toFixed(0)}
+                      </span>
+                      <span className="text-sm text-green-600">
+                        Save {discount}% right now
+                      </span>
+                    </>
+                  )}
                 </>
               )}
             </div>
+          </div>
+
+          {/* Variant Selector */}
+          {product.has_variants && (
+            <VariantSelector
+              productId={product.id}
+              onVariantChange={setSelectedVariant}
+            />
+          )}
+
+          {/* Stock and Price Info */}
+          <div className="text-sm text-muted-foreground">
+            {product.has_variants ? (
+              selectedVariant ? (
+                <span>
+                  {selectedVariant.stock > 0 
+                    ? `${selectedVariant.stock} in stock` 
+                    : 'Out of stock'}
+                </span>
+              ) : (
+                <span>Select options to check availability</span>
+              )
+            ) : (
+              <span>
+                {product.stock > 0 
+                  ? `${product.stock} in stock` 
+                  : 'Out of stock'}
+              </span>
+            )}
           </div>
 
           {/* Add to Cart Button */}
           <Button 
             size="lg" 
             className="w-full md:w-auto px-12 bg-[#1a1f2e] hover:bg-[#2a2f3e] text-white"
-            disabled={product.stock === 0}
+            disabled={
+              product.has_variants
+                ? !selectedVariant || selectedVariant.stock === 0
+                : product.stock === 0
+            }
           >
-            Add to Cart
+            {product.has_variants && !selectedVariant ? (
+              'Select Options'
+            ) : (
+              'Add to Cart'
+            )}
           </Button>
 
           {/* Features */}
